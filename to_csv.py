@@ -25,18 +25,20 @@ os.mkdir('csvs')
 
 posts = open_csv('posts')
 posts_rel = open_csv('posts_rel')
+posts_answers = open_csv('posts_answers')
 users = open_csv('users')
 users_posts_rel = open_csv('users_posts_rel')
 tags = open_csv('tags')
 tags_posts_rel = open_csv('tags_posts_rel')
 
-posts.writerow(['postId:ID(Post)', 'title', 'body'])
+posts.writerow(['postId:ID(Post)', 'title', 'postType:INT','createdAt','score:INT','views:INT','answers:INT','comments:INT','favorites:INT','updatedAt','body'])
 posts_rel.writerow([':START_ID(Post)', ':END_ID(Post)'])
+posts_answers.writerow([':START_ID(Post)', ':END_ID(Post)'])
 
-users.writerow(['userId:ID(User)', 'name'])
+users.writerow(['userId:ID(User)', 'name','reputation:INT','createdAt','accessedAt','url','location','views:INT','upvotes:INT','downvotes:INT','age:INT','accountId:INT'])
 users_posts_rel.writerow([':START_ID(User)', ':END_ID(Post)'])
 
-tags.writerow(['tagId:ID(Tag)'])
+tags.writerow(['tagId:ID(Tag)','count:INT','wikiPostId:INT'])
 tags_posts_rel.writerow([':START_ID(Post)', ':END_ID(Tag)'])
 
 for i, line in enumerate(open(file)):
@@ -44,20 +46,23 @@ for i, line in enumerate(open(file)):
     try:
         if line.startswith("<row"):
             el = xmltodict.parse(line)['row']
-            el = replace_keys(el)
+            _id = el['@Id']
             posts.writerow([
-                el['id'],
-                clean(el.get('title','')),
-                clean(el.get('body',''))
+                _id,
+                clean(el.get('@Title','')),
+                el['@PostTypeId'],el['@CreationDate'],el.get('@Score'),el.get('@ViewCount'),el.get('@AnswerCount'),el.get('@CommentCount'),el.get('@FavoriteCount'),el['@LastActivityDate'],
+                clean(el.get('@Body','')[0:240])
             ])
-            if el.get('parentid'):
-                posts_rel.writerow([el['parentid'],el['id']])
-            if el.get('owneruserid'):
-                users_posts_rel.writerow([el['owneruserid'],el['id']])
-            if el.get('tags'):
-                eltags = [x.replace('<','') for x in el.get('tags').split('>')]
+            if el.get('@AcceptedAnswerId'):
+                posts_answers.writerow([_id,el['@AcceptedAnswerId']])
+            if el.get('@ParentId'):
+                posts_rel.writerow([el['@ParentId'],_id])
+            if el.get('@OwnerUserId'):
+                users_posts_rel.writerow([el['@OwnerUserId'],_id])
+            if el.get('@Tags'):
+                eltags = [x.replace('<','') for x in el.get('@Tags').split('>')]
                 for tag in [x for x in eltags if x]:
-                    tags_posts_rel.writerow([el['id'],tag])
+                    tags_posts_rel.writerow([_id,tag])
     except Exception as e:
         print('x',e)
     if i and i % 5000 == 0:
@@ -74,14 +79,15 @@ for i, line in enumerate(open(file)):
     try:
         if line.startswith("<row"):
             el = xmltodict.parse(line)['row']
-            el = replace_keys(el)
             users.writerow([
-                el['id'],
-                clean(el.get('displayname','')),
+                el['@Id'],
+                clean(el.get('@DisplayName','')),
+                el.get('@Reputation'),el['@CreationDate'],el['@LastAccessDate'],el.get('@WebsiteUrl'),
+                clean(el.get('@Location','')),el.get('@Views'),el.get('@UpVotes'),el.get('@DownVotes'),el.get('@Age'),el.get('@AccountId')
             ])
     except Exception as e:
         print('x',e)
-    if i % 5000 == 0:
+    if i and i % 5000 == 0:
         print('.',end='')
 
 print(i,'users ok')
@@ -93,13 +99,12 @@ for i, line in enumerate(open(file)):
     try:
         if line.startswith("<row"):
             el = xmltodict.parse(line)['row']
-            el = replace_keys(el)
             tags.writerow([
-                el['tagname'],
+                el['@TagName'],el.get('@Count'),el.get('@WikiPostId')
             ])
     except Exception as e:
         print('x',e)
-    if i % 5000 == 0:
+    if i and i % 5000 == 0:
         print('.',end='')
 
 print(i,'tags ok')
